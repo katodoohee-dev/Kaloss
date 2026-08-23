@@ -3,7 +3,7 @@ services:
     runtime: static
     name: party-word-guess
     buildCommand: echo "static-site"
-    staticPublishPath: .
+    staticPublishPath: pwg-runtime
     pullRequestPreviewsEnabled: true
     routes:
       - type: rewrite
