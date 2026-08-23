@@ -1,0 +1,45 @@
+name: Polish Party Word Guess feedback
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    if: ${{ !contains(github.event.head_commit.message, 'Polish Party Word Guess feedback') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply feedback polish
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('pwg-runtime/index.html')
+          s = p.read_text(encoding='utf-8')
+          if '.word-card.correct-state' not in s:
+              marker = '.hint{font-size:.68rem;color:var(--muted);font-weight:700}'
+              extra = '.word-card{transition:background .18s ease,box-shadow .18s ease,transform .18s ease}.word-card.correct-state{background:var(--mint-soft);box-shadow:0 25px 60px rgba(43,118,88,.20),inset 0 0 0 3px #CDECDD}.word-card.pass-state{background:var(--butter-soft);box-shadow:0 25px 60px rgba(125,103,25,.16),inset 0 0 0 3px #FBE8A6}.word-card.correct-state .eyebrow{background:var(--mint);color:var(--mint-ink)}.word-card.pass-state .eyebrow{background:var(--butter);color:var(--butter-ink)}.word-card.correct-state .word{animation:statuspop .28s var(--spring)}.word-card.pass-state .word{animation:statusshake .28s ease}@keyframes statuspop{0%{transform:scale(.94)}100%{transform:scale(1)}}@keyframes statusshake{0%{transform:translateX(0)}35%{transform:translateX(-3px)}70%{transform:translateX(3px)}100%{transform:translateX(0)}}'
+              if marker not in s: raise SystemExit('CSS marker not found')
+              s = s.replace(marker, marker + extra, 1)
+              old = 'class="word-card ${state.stage==="correct"?\'correct-state\':state.stage==="pass"?\'pass-state\':\'\'}"'
+              if old not in s:
+                  old = 'class="word-card ${state.stage==="correct"?\'\':\' \'}"'
+              if old.endswith(' \'}"'):
+                  pass
+              s = s.replace(old, 'class="word-card ${state.stage==="correct"?\'correct-state\':state.stage==="pass"?\'pass-state\':\'\'}"', 1)
+          old_sfx = 'function playSfx(k){if(k==="correct")tone(740,.12);else if(k==="pass")tone(420,.10);else if(k==="timeup"){tone(260,.18);setTimeout(()=>tone(190,.22),120)}}'
+          new_sfx = 'function playSfx(k){if(!state.sound)return;if(k==="correct"){tone(660,.09);setTimeout(()=>tone(880,.12),70)}else if(k==="pass"){tone(460,.10);setTimeout(()=>tone(360,.12),65)}else if(k==="timeup"){tone(260,.18);setTimeout(()=>tone(190,.22),120)}}'
+          if old_sfx in s: s = s.replace(old_sfx, new_sfx, 1)
+          elif 'function playSfx(k)' not in s: raise SystemExit('SFX function not found')
+          p.write_text(s, encoding='utf-8')
+      - name: Commit polished feedback
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pwg-runtime/index.html
+          git diff --cached --quiet && exit 0
+          git commit -m "Polish Party Word Guess feedback"
+          git push
