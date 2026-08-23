@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Apply feedback polish
+      - name: Apply feedback polish and runtime hardening
         shell: python
         run: |
           from pathlib import Path
@@ -24,17 +24,22 @@ jobs:
               extra = '.word-card{transition:background .18s ease,box-shadow .18s ease,transform .18s ease}.word-card.correct-state{background:var(--mint-soft);box-shadow:0 25px 60px rgba(43,118,88,.20),inset 0 0 0 3px #CDECDD}.word-card.pass-state{background:var(--butter-soft);box-shadow:0 25px 60px rgba(125,103,25,.16),inset 0 0 0 3px #FBE8A6}.word-card.correct-state .eyebrow{background:var(--mint);color:var(--mint-ink)}.word-card.pass-state .eyebrow{background:var(--butter);color:var(--butter-ink)}.word-card.correct-state .word{animation:statuspop .28s var(--spring)}.word-card.pass-state .word{animation:statusshake .28s ease}@keyframes statuspop{0%{transform:scale(.94)}100%{transform:scale(1)}}@keyframes statusshake{0%{transform:translateX(0)}35%{transform:translateX(-3px)}70%{transform:translateX(3px)}100%{transform:translateX(0)}}'
               if marker not in s: raise SystemExit('CSS marker not found')
               s = s.replace(marker, marker + extra, 1)
-              old = 'class="word-card ${state.stage==="correct"?\'correct-state\':state.stage==="pass"?\'pass-state\':\'\'}"'
-              if old not in s:
-                  old = 'class="word-card ${state.stage==="correct"?\'\':\' \'}"'
-              if old.endswith(' \'}"'):
-                  pass
-              s = s.replace(old, 'class="word-card ${state.stage==="correct"?\'correct-state\':state.stage==="pass"?\'pass-state\':\'\'}"', 1)
           old_sfx = 'function playSfx(k){if(k==="correct")tone(740,.12);else if(k==="pass")tone(420,.10);else if(k==="timeup"){tone(260,.18);setTimeout(()=>tone(190,.22),120)}}'
           new_sfx = 'function playSfx(k){if(!state.sound)return;if(k==="correct"){tone(660,.09);setTimeout(()=>tone(880,.12),70)}else if(k==="pass"){tone(460,.10);setTimeout(()=>tone(360,.12),65)}else if(k==="timeup"){tone(260,.18);setTimeout(()=>tone(190,.22),120)}}'
           if old_sfx in s: s = s.replace(old_sfx, new_sfx, 1)
-          elif 'function playSfx(k)' not in s: raise SystemExit('SFX function not found')
+          s = s.replace('voice:localStorage.getItem("pwg.voice")!=="0"', 'voice:localStorage.getItem("pwg.voice")==="1"', 1)
+          s = s.replace('state.voiceSupported=true;const r=new R();', 'state.voiceSupported=true;let r;try{r=new R()}catch{state.voiceSupported=false;return}', 1)
+          s = s.replace('initVoiceRecognition();render();</script>', 'render();</script>', 1)
           p.write_text(s, encoding='utf-8')
+      - name: Validate runtime JavaScript
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('pwg-runtime/index.html').read_text(encoding='utf-8')
+          js=s.split('<script>',1)[1].rsplit('</script>',1)[0]
+          Path('/tmp/pwg-runtime.js').write_text(js,encoding='utf-8')
+          PY
+          node --check /tmp/pwg-runtime.js
       - name: Commit polished feedback
         run: |
           git config user.name "github-actions[bot]"
